@@ -21,8 +21,8 @@
 3. 进入 `Actions`。
 4. 选择 `Build APK`。
 5. 如果没有自动运行，点击 `Run workflow`。
-6. 构建完成后，在页面底部 `Artifacts` 下载 `VolumeScheduler-debug-apk`。
-7. 解压后得到 `app-debug.apk`，安装到 Android 手机。
+6. 构建完成后，在页面底部 `Artifacts` 下载 `VolumeScheduler-release-apk`。
+7. 解压后得到 `app-release.apk`，安装到 Android 手机。
 
 ## 本地推送示例
 
@@ -53,4 +53,4 @@ git push -u origin main
 - 本应用只切换手机响铃模式，不设置铃声、通知、媒体、系统、通话或闹钟音量。
 - 闹钟保持系统原本设定：原来震动就震动，原来静音就静音，原来有声音就有声音。
 - 不同 Android 版本和手机品牌对静音/震动模式限制不同，某些系统可能需要额外允许自启动、后台运行或勿扰相关权限。
-- debug APK 适合自己安装测试，不适合直接上架应用商店。
+- 当前 release APK 使用默认 debug 签名，适合自己安装使用，不适合直接上架应用商店。
