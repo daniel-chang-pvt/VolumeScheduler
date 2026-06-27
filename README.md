@@ -2,6 +2,12 @@
 
 一个低资源占用的 Android 定时铃声模式控制应用。
 
+应用包名：
+
+```text
+com.danielchang.volumescheduler
+```
+
 ## 功能
 
 - 总开关：关闭后取消所有自动触发，不再切换手机铃声模式。

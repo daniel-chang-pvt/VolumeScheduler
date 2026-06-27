@@ -1,4 +1,4 @@
-package com.example.volumescheduler
+package com.danielchang.volumescheduler
 
 import android.app.AlarmManager
 import android.app.PendingIntent
@@ -8,7 +8,7 @@ import java.util.Calendar
 
 object AlarmScheduler {
     // BroadcastReceiver 通过 action 和 rule id 知道“哪条规则到时间了”。
-    const val ACTION_APPLY_RULE = "com.example.volumescheduler.APPLY_RULE"
+    const val ACTION_APPLY_RULE = "com.danielchang.volumescheduler.APPLY_RULE"
     const val EXTRA_RULE_ID = "rule_id"
 
     /**

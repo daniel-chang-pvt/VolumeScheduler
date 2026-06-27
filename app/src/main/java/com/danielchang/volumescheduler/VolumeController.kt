@@ -1,4 +1,4 @@
-package com.example.volumescheduler
+package com.danielchang.volumescheduler
 
 import android.content.Context
 import android.media.AudioManager

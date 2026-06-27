@@ -1,4 +1,4 @@
-package com.example.volumescheduler
+package com.danielchang.volumescheduler
 
 /**
  * 用户在每条规则里选择的目标铃声模式。
