@@ -4,7 +4,6 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import java.util.Calendar
 
 object AlarmScheduler {
@@ -35,18 +34,12 @@ object AlarmScheduler {
         val pendingIntent = pendingIntent(context, rule.id)
 
         // 不使用常驻后台服务，也不每分钟轮询时间。
-        // AlarmManager 会在时间点唤醒一次 BroadcastReceiver，执行完进程即可结束，资源占用最低。
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (alarmManager.canScheduleExactAlarms()) {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
-            } else {
-                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
-            }
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
-        } else {
-            alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
-        }
+        // setAlarmClock 是“闹钟级别”的系统调度，比 setExactAndAllowWhileIdle 更不容易被锁屏、
+        // Doze 或省电策略延迟。代价是系统可能在状态栏显示一个即将到来的闹钟图标。
+        alarmManager.setAlarmClock(
+            AlarmManager.AlarmClockInfo(triggerAt, showPendingIntent(context, rule.id)),
+            pendingIntent
+        )
     }
 
     fun cancelRule(context: Context, ruleId: Long) {
@@ -62,6 +55,16 @@ object AlarmScheduler {
 
         // requestCode 使用 ruleId，确保每条规则对应一个独立的系统闹钟。
         return PendingIntent.getBroadcast(
+            context,
+            ruleId.hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    private fun showPendingIntent(context: Context, ruleId: Long): PendingIntent {
+        val intent = Intent(context, MainActivity::class.java)
+        return PendingIntent.getActivity(
             context,
             ruleId.hashCode(),
             intent,

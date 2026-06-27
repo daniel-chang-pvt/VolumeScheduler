@@ -1,7 +1,6 @@
 package com.example.volumescheduler
 
 import android.app.Activity
-import android.app.AlarmManager
 import android.app.AlertDialog
 import android.app.NotificationManager
 import android.content.Context
@@ -10,6 +9,7 @@ import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import android.text.InputType
 import android.view.View
@@ -32,6 +32,10 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        if (RuleRepository.isGlobalEnabled(this)) {
+            // 从系统设置页返回、App 更新后首次打开等场景，都主动刷新一次系统闹钟注册。
+            AlarmScheduler.scheduleAll(this)
+        }
         if (::root.isInitialized) render()
     }
 
@@ -57,15 +61,15 @@ class MainActivity : Activity() {
         addGlobalSwitch()
         root.addSpace(12)
 
-        if (RuleRepository.isGlobalEnabled(this) && !canScheduleExactAlarms()) {
-            // Android 12+ 可能需要用户手动允许精确闹钟，否则熄屏/省电时触发可能延迟。
-            addExactAlarmNotice()
-            root.addSpace(12)
-        }
-
         if (RuleRepository.isGlobalEnabled(this) && !hasNotificationPolicyAccess()) {
             // 切换静音/震动模式在部分系统上属于“通知策略”相关能力。
             addNotificationPolicyNotice()
+            root.addSpace(12)
+        }
+
+        if (RuleRepository.isGlobalEnabled(this) && !isIgnoringBatteryOptimizations()) {
+            // 某些厂商系统会在锁屏后限制后台广播，加入电池优化白名单可提高触发成功率。
+            addBatteryOptimizationNotice()
             root.addSpace(12)
         }
 
@@ -96,9 +100,9 @@ class MainActivity : Activity() {
         }
         val text = TextView(this).apply {
             this.text = if (RuleRepository.isGlobalEnabled(this@MainActivity)) {
-                "自动音量控制\n已开启：到时间会自动执行启用的规则"
+                "自动铃声模式\n已开启：到时间会自动执行启用的规则"
             } else {
-                "自动音量控制\n已关闭：不会自动修改手机音量"
+                "自动铃声模式\n已关闭：不会自动切换手机模式"
             }
             textSize = 16f
             typeface = Typeface.DEFAULT_BOLD
@@ -114,23 +118,23 @@ class MainActivity : Activity() {
         root.addView(row)
     }
 
-    private fun addExactAlarmNotice() {
+    private fun addBatteryOptimizationNotice() {
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(12), dp(12), dp(12), dp(12))
             background = backgroundDrawable(0xFFFFF1CC.toInt())
         }
         box.addView(TextView(this).apply {
-            text = "建议允许“闹钟和提醒”权限"
+            text = "建议允许“忽略电池优化”"
             textSize = 16f
             typeface = Typeface.DEFAULT_BOLD
         })
         box.addView(TextView(this).apply {
-            text = "未允许时，省电模式下触发时间可能延迟。"
+            text = "部分手机锁屏后会限制后台触发，允许后更容易准时执行。"
         })
         box.addView(Button(this).apply {
             text = "去设置"
-            setOnClickListener { openExactAlarmSettings() }
+            setOnClickListener { openBatteryOptimizationSettings() }
         })
         root.addView(box)
     }
@@ -298,24 +302,25 @@ class MainActivity : Activity() {
             cornerRadius = dp(12).toFloat()
         }
 
-    private fun canScheduleExactAlarms(): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
-        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        return alarmManager.canScheduleExactAlarms()
-    }
-
     private fun hasNotificationPolicyAccess(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         return notificationManager.isNotificationPolicyAccessGranted
     }
 
-    private fun openExactAlarmSettings() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+    private fun isIgnoringBatteryOptimizations(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        return powerManager.isIgnoringBatteryOptimizations(packageName)
+    }
+
+    private fun openBatteryOptimizationSettings() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val requestIntent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
                 data = Uri.parse("package:$packageName")
             }
-            startActivity(intent)
+            runCatching { startActivity(requestIntent) }
+                .onFailure { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
         }
     }
 

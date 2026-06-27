@@ -7,7 +7,7 @@
 - 总开关：关闭后取消所有自动触发。
 - 多条每日规则：每条规则有独立时间、启用状态和目标模式。
 - 目标模式：静音、震动、声音。
-- 到点触发：使用 `AlarmManager`，不使用常驻后台服务。
+- 到点触发：使用 `AlarmManager.setAlarmClock`，不使用常驻后台服务。
 - 开机恢复：手机重启后重新注册启用规则。
 - 手动测试：每条规则可点击“立即应用此规则”。
 - 不修改任何音量档位，尤其不影响闹钟音量和闹钟原有设定。
@@ -41,7 +41,7 @@
 
 - `AlarmScheduler.kt`
   - 定时任务注册和取消。
-  - 使用 `AlarmManager` 创建每条规则的系统闹钟。
+  - 使用 `AlarmManager.setAlarmClock` 创建每条规则的系统闹钟级触发。
   - 触发一次后由 Receiver 再注册下一天。
 
 - `VolumeAlarmReceiver.kt`
@@ -65,7 +65,7 @@ MainActivity
   -> RuleRepository.upsertRule
   -> RuleRepository.saveRules
   -> AlarmScheduler.scheduleAll
-  -> AlarmManager 注册系统闹钟
+  -> AlarmManager.setAlarmClock 注册系统闹钟级触发
 ```
 
 到设定时间后：
@@ -119,14 +119,16 @@ Android 发送 BOOT_COMPLETED
 - `RECEIVE_BOOT_COMPLETED`
   - 手机重启后重新注册定时任务。
 
-- `SCHEDULE_EXACT_ALARM`
-  - Android 12+ 上用于更准时地触发定时任务。
+- `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`
+  - 请求用户把应用加入电池优化白名单，提高锁屏和后台触发成功率。
 
 ## 为什么不使用后台服务
 
 这个应用每天只需要在少量固定时间点执行一次。如果使用常驻后台服务，会更耗电，也更容易被 Android 后台限制杀掉。
 
-当前方案使用 `AlarmManager`：平时 App 不运行，到点后系统唤醒一次，执行完成后结束。这是更省资源的方式。
+当前方案使用 `AlarmManager.setAlarmClock`：平时 App 不运行，到点后系统按闹钟级别唤醒一次，执行完成后结束。这是兼顾省资源和锁屏可靠性的方式。
+
+`setAlarmClock` 的代价是部分手机会显示一个即将到来的闹钟图标。这是系统认为该触发需要可靠执行的表现。
 
 ## 为什么不修改音量
 
@@ -154,7 +156,9 @@ Android 发送 BOOT_COMPLETED
 
 ### 熄屏能否触发
 
-代码使用 `AlarmManager.RTC_WAKEUP`，设计上支持熄屏触发。但 Android 12+ 需要“闹钟和提醒”权限才能更准时，部分国产系统还需要允许自启动、后台运行或关闭电池优化。
+代码使用 `AlarmManager.setAlarmClock`，比普通 `setExactAndAllowWhileIdle` 更适合锁屏和深度待机场景。仍建议允许“忽略电池优化”，部分国产系统还需要允许自启动、后台运行。
+
+如果用户手动“强行停止”应用，Android 会取消该应用的后台触发能力，直到下次手动打开 App。
 
 ### 为什么需要勿扰/通知策略权限
 
