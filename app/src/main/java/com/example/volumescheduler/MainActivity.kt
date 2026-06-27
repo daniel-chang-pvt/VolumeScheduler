@@ -223,7 +223,7 @@ class MainActivity : Activity() {
         setText(value)
         hint = hintText
         inputType = InputType.TYPE_CLASS_NUMBER
-        selectAllOnFocus = true
+        setSelectAllOnFocus(true)
     }
 
     private fun volumeEditor(
