@@ -16,8 +16,9 @@ import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.ScrollView
-import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
 
@@ -44,7 +45,7 @@ class MainActivity : Activity() {
         setContentView(scrollView)
 
         val title = TextView(this).apply {
-            text = "定时音量"
+            text = "定时铃声模式"
             textSize = 28f
             typeface = Typeface.DEFAULT_BOLD
         }
@@ -73,7 +74,7 @@ class MainActivity : Activity() {
         val rules = RuleRepository.getRules(this)
         if (rules.isEmpty()) {
             root.addView(TextView(this).apply {
-                text = "还没有规则。添加一个时间点，并设置各类音量百分比。"
+                text = "还没有规则。添加一个时间点，并选择静音、震动或声音。"
                 textSize = 16f
             })
         } else {
@@ -141,7 +142,7 @@ class MainActivity : Activity() {
             typeface = Typeface.DEFAULT_BOLD
         })
         box.addView(TextView(this).apply {
-            text = "部分手机需要此权限，应用才能把来电响铃模式切换为静音。"
+            text = "部分手机需要此权限，应用才能切换静音、震动、声音模式。"
         })
         box.addView(Button(this).apply {
             text = "去设置"
@@ -196,7 +197,7 @@ class MainActivity : Activity() {
 
     private fun showRuleDialog(initialRule: VolumeRule) {
         var enabled = initialRule.enabled
-        var volumes = initialRule.volumes.withDefaults().toMutableMap()
+        var profile = initialRule.profile
 
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -219,12 +220,25 @@ class MainActivity : Activity() {
         container.addView(timeRow)
         container.addSpace(10)
 
-        VolumeKind.values().forEach { kind ->
-            val setting = volumes[kind] ?: VolumeSetting()
-            val block = volumeEditor(kind, setting) { changed -> volumes[kind] = changed }
-            container.addView(block)
-            container.addSpace(8)
+        container.addView(TextView(this).apply {
+            text = "到时间切换为"
+            textSize = 16f
+            typeface = Typeface.DEFAULT_BOLD
+        })
+        val profileGroup = RadioGroup(this).apply {
+            orientation = RadioGroup.VERTICAL
         }
+        RingerProfile.values().forEachIndexed { index, item ->
+            profileGroup.addView(RadioButton(this).apply {
+                id = index + 1
+                text = item.label
+                isChecked = item == profile
+            })
+        }
+        profileGroup.setOnCheckedChangeListener { _, checkedId ->
+            profile = RingerProfile.values().getOrElse(checkedId - 1) { RingerProfile.NORMAL }
+        }
+        container.addView(profileGroup)
 
         val scrollView = ScrollView(this).apply { addView(container) }
         AlertDialog.Builder(this)
@@ -239,7 +253,7 @@ class MainActivity : Activity() {
                         enabled = enabled,
                         hour = hour,
                         minute = minute,
-                        volumes = volumes
+                        profile = profile
                     )
                 )
                 render()
@@ -259,61 +273,9 @@ class MainActivity : Activity() {
         setSelectAllOnFocus(true)
     }
 
-    private fun volumeEditor(
-        kind: VolumeKind,
-        initialSetting: VolumeSetting,
-        onChange: (VolumeSetting) -> Unit
-    ): View {
-        var current = initialSetting
-        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.CENTER_VERTICAL
-        }
-        val label = TextView(this).apply {
-            text = "${kind.label} ${current.percent}%"
-            typeface = Typeface.DEFAULT_BOLD
-        }
-        val switch = Switch(this).apply { isChecked = current.enabled }
-        val seekBar = SeekBar(this).apply {
-            max = 100
-            progress = current.percent
-            isEnabled = current.enabled
-        }
-
-        switch.setOnCheckedChangeListener { _, checked ->
-            current = current.copy(enabled = checked)
-            seekBar.isEnabled = checked
-            onChange(current)
-        }
-        seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                current = current.copy(percent = progress.coerceIn(0, 100))
-                label.text = "${kind.label} ${current.percent}%"
-                onChange(current)
-            }
-
-            override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
-            override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
-        })
-
-        row.addView(label, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        row.addView(switch)
-        box.addView(row)
-        box.addView(seekBar)
-        return box
-    }
-
     private fun VolumeRule.summary(): String {
-        val enabledVolumes = VolumeKind.values().mapNotNull { kind ->
-            val setting = volumes[kind]
-            if (setting?.enabled == true) "${kind.label} ${setting.percent}%" else null
-        }
-        return if (enabledVolumes.isEmpty()) "不修改任何音量" else enabledVolumes.joinToString(" / ")
+        return "到点切换为：${profile.label}"
     }
-
-    private fun Map<VolumeKind, VolumeSetting>.withDefaults(): Map<VolumeKind, VolumeSetting> =
-        VolumeKind.values().associateWith { this[it] ?: VolumeSetting() }
 
     private fun LinearLayout.addSpace(dp: Int) {
         addView(View(this@MainActivity), LinearLayout.LayoutParams(1, dp(dp)))

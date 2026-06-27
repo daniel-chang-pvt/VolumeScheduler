@@ -67,31 +67,23 @@ object RuleRepository {
         put("enabled", enabled)
         put("hour", hour)
         put("minute", minute)
-        val volumeJson = JSONObject()
-        volumes.forEach { (kind, setting) ->
-            volumeJson.put(kind.name, JSONObject().apply {
-                put("enabled", setting.enabled)
-                put("percent", setting.percent)
-            })
-        }
-        put("volumes", volumeJson)
+        put("profile", profile.name)
     }
 
-    private fun JSONObject.toRule(): VolumeRule {
-        val volumeJson = optJSONObject("volumes") ?: JSONObject()
-        val volumes = VolumeKind.values().associateWith { kind ->
-            val settingJson = volumeJson.optJSONObject(kind.name)
-            VolumeSetting(
-                enabled = settingJson?.optBoolean("enabled", true) ?: true,
-                percent = settingJson?.optInt("percent", 50)?.coerceIn(0, 100) ?: 50
-            )
-        }
-        return VolumeRule(
-            id = optLong("id", System.currentTimeMillis()),
-            enabled = optBoolean("enabled", true),
-            hour = optInt("hour", 8).coerceIn(0, 23),
-            minute = optInt("minute", 0).coerceIn(0, 59),
-            volumes = volumes
-        )
+    private fun JSONObject.toRule(): VolumeRule = VolumeRule(
+        id = optLong("id", System.currentTimeMillis()),
+        enabled = optBoolean("enabled", true),
+        hour = optInt("hour", 8).coerceIn(0, 23),
+        minute = optInt("minute", 0).coerceIn(0, 59),
+        profile = parseProfile()
+    )
+
+    private fun JSONObject.parseProfile(): RingerProfile {
+        val profileName = optString("profile", "")
+        RingerProfile.values().firstOrNull { it.name == profileName }?.let { return it }
+
+        val oldRingSetting = optJSONObject("volumes")?.optJSONObject("RING")
+        val oldRingPercent = oldRingSetting?.optInt("percent", 100) ?: 100
+        return if (oldRingPercent == 0) RingerProfile.SILENT else RingerProfile.NORMAL
     }
 }
