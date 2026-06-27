@@ -3,6 +3,7 @@ package com.example.volumescheduler
 import android.app.Activity
 import android.app.AlarmManager
 import android.app.AlertDialog
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Typeface
@@ -55,6 +56,11 @@ class MainActivity : Activity() {
 
         if (RuleRepository.isGlobalEnabled(this) && !canScheduleExactAlarms()) {
             addExactAlarmNotice()
+            root.addSpace(12)
+        }
+
+        if (RuleRepository.isGlobalEnabled(this) && !hasNotificationPolicyAccess()) {
+            addNotificationPolicyNotice()
             root.addSpace(12)
         }
 
@@ -123,6 +129,27 @@ class MainActivity : Activity() {
         root.addView(box)
     }
 
+    private fun addNotificationPolicyNotice() {
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            background = backgroundDrawable(0xFFFFE5E5.toInt())
+        }
+        box.addView(TextView(this).apply {
+            text = "建议允许“勿扰/通知策略”权限"
+            textSize = 16f
+            typeface = Typeface.DEFAULT_BOLD
+        })
+        box.addView(TextView(this).apply {
+            text = "部分手机需要此权限，应用才能把来电响铃模式切换为静音。"
+        })
+        box.addView(Button(this).apply {
+            text = "去设置"
+            setOnClickListener { openNotificationPolicySettings() }
+        })
+        root.addView(box)
+    }
+
     private fun addRuleCard(rule: VolumeRule) {
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -156,6 +183,12 @@ class MainActivity : Activity() {
         card.addView(TextView(this).apply {
             text = "点击卡片编辑"
             textSize = 12f
+        })
+        card.addView(Button(this).apply {
+            text = "立即应用此规则"
+            setOnClickListener {
+                VolumeController.applyRule(this@MainActivity, rule)
+            }
         })
         root.addView(card)
         root.addSpace(10)
@@ -300,12 +333,24 @@ class MainActivity : Activity() {
         return alarmManager.canScheduleExactAlarms()
     }
 
+    private fun hasNotificationPolicyAccess(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        return notificationManager.isNotificationPolicyAccessGranted
+    }
+
     private fun openExactAlarmSettings() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
                 data = Uri.parse("package:$packageName")
             }
             startActivity(intent)
+        }
+    }
+
+    private fun openNotificationPolicySettings() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
         }
     }
 }
