@@ -38,6 +38,14 @@ git push -u origin main
 
 如果已经设置过 `origin`，不要重复执行 `git remote add origin`，直接 `git push` 即可。
 
+## 开发文档
+
+项目结构、执行流程、数据格式、权限说明和二次开发入口见：
+
+```text
+docs/ARCHITECTURE.md
+```
+
 ## 手机权限说明
 
 安装后建议检查这些设置：

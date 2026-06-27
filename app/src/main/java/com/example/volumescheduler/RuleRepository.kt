@@ -5,6 +5,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 object RuleRepository {
+    // SharedPreferences 文件名和 key。项目数据量很小，用 SharedPreferences 足够简单可靠。
     private const val PREFS_NAME = "volume_scheduler"
     private const val KEY_GLOBAL_ENABLED = "global_enabled"
     private const val KEY_RULES = "rules"
@@ -14,6 +15,8 @@ object RuleRepository {
 
     fun setGlobalEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_GLOBAL_ENABLED, enabled).apply()
+
+        // 总开关是最高优先级：关闭时取消全部系统闹钟，避免之后继续自动切换。
         if (enabled) {
             AlarmScheduler.scheduleAll(context)
         } else {
@@ -23,6 +26,8 @@ object RuleRepository {
 
     fun getRules(context: Context): List<VolumeRule> {
         val raw = prefs(context).getString(KEY_RULES, null) ?: return emptyList()
+
+        // 数据损坏时返回空列表，避免 App 启动崩溃。个人工具优先保证可打开可修正。
         return runCatching {
             val array = JSONArray(raw)
             buildList {
@@ -37,6 +42,8 @@ object RuleRepository {
         val array = JSONArray()
         rules.forEach { array.put(it.toJson()) }
         prefs(context).edit().putString(KEY_RULES, array.toString()).apply()
+
+        // 规则变化后必须重新安排 AlarmManager，否则系统里仍可能保留旧时间。
         if (isGlobalEnabled(context)) {
             AlarmScheduler.scheduleAll(context)
         } else {
@@ -82,6 +89,8 @@ object RuleRepository {
         val profileName = optString("profile", "")
         RingerProfile.values().firstOrNull { it.name == profileName }?.let { return it }
 
+        // 兼容早期版本保存的“音量百分比规则”：旧规则里铃声音量为 0 时迁移为静音，
+        // 其他情况迁移为声音。迁移只发生在读取时，不会再保留旧音量控制逻辑。
         val oldRingSetting = optJSONObject("volumes")?.optJSONObject("RING")
         val oldRingPercent = oldRingSetting?.optInt("percent", 100) ?: 100
         return if (oldRingPercent == 0) RingerProfile.SILENT else RingerProfile.NORMAL

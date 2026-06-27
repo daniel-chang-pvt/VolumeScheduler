@@ -36,6 +36,8 @@ class MainActivity : Activity() {
     }
 
     private fun render() {
+        // 本项目没有使用 XML 布局或 Compose，界面全部用原生 View 动态创建。
+        // 好处是依赖少、构建快；缺点是界面代码会集中在这个 Activity 中。
         val scrollView = ScrollView(this)
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -56,11 +58,13 @@ class MainActivity : Activity() {
         root.addSpace(12)
 
         if (RuleRepository.isGlobalEnabled(this) && !canScheduleExactAlarms()) {
+            // Android 12+ 可能需要用户手动允许精确闹钟，否则熄屏/省电时触发可能延迟。
             addExactAlarmNotice()
             root.addSpace(12)
         }
 
         if (RuleRepository.isGlobalEnabled(this) && !hasNotificationPolicyAccess()) {
+            // 切换静音/震动模式在部分系统上属于“通知策略”相关能力。
             addNotificationPolicyNotice()
             root.addSpace(12)
         }
@@ -83,6 +87,7 @@ class MainActivity : Activity() {
     }
 
     private fun addGlobalSwitch() {
+        // 总开关改变时会立即注册或取消系统闹钟，逻辑在 RuleRepository.setGlobalEnabled 中。
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
@@ -152,6 +157,7 @@ class MainActivity : Activity() {
     }
 
     private fun addRuleCard(rule: VolumeRule) {
+        // 首页每张卡片代表一条每日重复规则。点击卡片编辑，右侧开关只控制该规则。
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(12), dp(12), dp(12), dp(12))
@@ -188,6 +194,7 @@ class MainActivity : Activity() {
         card.addView(Button(this).apply {
             text = "立即应用此规则"
             setOnClickListener {
+                // 测试入口：不用等定时时间到，直接执行同一套规则应用逻辑。
                 VolumeController.applyRule(this@MainActivity, rule)
             }
         })
@@ -196,6 +203,7 @@ class MainActivity : Activity() {
     }
 
     private fun showRuleDialog(initialRule: VolumeRule) {
+        // 对话框中先在局部变量里暂存编辑结果，只有点击“保存”才写入 SharedPreferences。
         var enabled = initialRule.enabled
         var profile = initialRule.profile
 
@@ -245,6 +253,7 @@ class MainActivity : Activity() {
             .setTitle("编辑规则")
             .setView(scrollView)
             .setPositiveButton("保存") { _, _ ->
+                // 输入非法时回退到默认 08:00；正常情况下数字输入框已限制为数字。
                 val hour = hourInput.text.toString().toIntOrNull()?.coerceIn(0, 23) ?: 8
                 val minute = minuteInput.text.toString().toIntOrNull()?.coerceIn(0, 59) ?: 0
                 RuleRepository.upsertRule(
