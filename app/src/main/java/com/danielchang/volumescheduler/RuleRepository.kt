@@ -9,6 +9,8 @@ object RuleRepository {
     private const val PREFS_NAME = "volume_scheduler"
     private const val KEY_GLOBAL_ENABLED = "global_enabled"
     private const val KEY_RULES = "rules"
+    private const val KEY_TRIGGER_LOGS = "trigger_logs"
+    private const val MAX_TRIGGER_LOGS = 200
 
     fun isGlobalEnabled(context: Context): Boolean =
         prefs(context).getBoolean(KEY_GLOBAL_ENABLED, false)
@@ -61,9 +63,43 @@ object RuleRepository {
         saveRules(context, updated)
     }
 
+    fun hasTimeConflict(context: Context, rule: VolumeRule): Boolean =
+        getRules(context).any { it.id != rule.id && it.hour == rule.hour && it.minute == rule.minute }
+
     fun deleteRule(context: Context, ruleId: Long) {
         AlarmScheduler.cancelRule(context, ruleId)
         saveRules(context, getRules(context).filterNot { it.id == ruleId })
+    }
+
+    fun getTriggerLogs(context: Context): List<TriggerLog> {
+        val raw = prefs(context).getString(KEY_TRIGGER_LOGS, null) ?: return emptyList()
+        return runCatching {
+            val array = JSONArray(raw)
+            buildList {
+                for (index in 0 until array.length()) {
+                    val item = array.getJSONObject(index)
+                    add(
+                        TriggerLog(
+                            timestampMillis = item.optLong("timestampMillis", 0L),
+                            description = item.optString("description")
+                        )
+                    )
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    fun addTriggerLog(context: Context, description: String) {
+        val updated = (listOf(TriggerLog(description = description)) + getTriggerLogs(context))
+            .take(MAX_TRIGGER_LOGS)
+        val array = JSONArray()
+        updated.forEach { log ->
+            array.put(JSONObject().apply {
+                put("timestampMillis", log.timestampMillis)
+                put("description", log.description)
+            })
+        }
+        prefs(context).edit().putString(KEY_TRIGGER_LOGS, array.toString()).apply()
     }
 
     private fun prefs(context: Context) =

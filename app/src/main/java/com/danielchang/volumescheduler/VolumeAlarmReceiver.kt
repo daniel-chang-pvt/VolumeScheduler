@@ -14,10 +14,20 @@ class VolumeAlarmReceiver : BroadcastReceiver() {
 
         val rule = RuleRepository.getRules(context).firstOrNull { it.id == ruleId } ?: return
         if (rule.enabled) {
-            VolumeController.applyRule(context, rule)
+            val applied = VolumeController.applyRule(context, rule)
+            RuleRepository.addTriggerLog(
+                context,
+                if (applied) rule.triggerDescription() else "${rule.timeText()} 触发失败：无法切换为${rule.profile.label}"
+            )
 
             // AlarmManager 的一次性闹钟触发后会失效，所以执行完要安排下一天。
             AlarmScheduler.scheduleRule(context, rule)
         }
+    }
+
+    private fun VolumeRule.triggerDescription(): String = when (profile) {
+        RingerProfile.SILENT -> "${timeText()} 触发：关闭声音，关闭震动，开启静音"
+        RingerProfile.VIBRATE -> "${timeText()} 触发：关闭声音，开启震动"
+        RingerProfile.NORMAL -> "${timeText()} 触发：开启声音，关闭震动"
     }
 }

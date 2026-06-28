@@ -12,10 +12,11 @@ com.danielchang.volumescheduler
 
 - 总开关：关闭后取消所有自动触发。
 - 多条每日规则：每条规则有独立时间、启用状态和目标模式。
+- 同一个时分只能存在一条规则，避免同一时间多条规则互相覆盖。
 - 目标模式：静音、震动、声音。
 - 到点触发：使用 `AlarmManager.setAlarmClock`，不使用常驻后台服务。
 - 开机恢复：手机重启后重新注册启用规则。
-- 手动测试：每条规则可点击“立即应用此规则”。
+- 触发记录：每次定时触发后写入一条记录，最新记录显示在最上方。
 - 不修改任何音量档位，尤其不影响闹钟音量和闹钟原有设定。
 
 ## 设计原则
@@ -33,7 +34,7 @@ com.danielchang.volumescheduler
 - `MainActivity.kt`
   - 主界面。
   - 动态创建原生 Android View，不依赖 XML 布局或 Jetpack Compose。
-  - 提供总开关、规则列表、添加/编辑规则、权限提示和立即应用按钮。
+  - 提供总开关、规则列表、添加/编辑规则、权限提示和触发记录。
 
 - `VolumeModels.kt`
   - 数据模型。
@@ -42,7 +43,7 @@ com.danielchang.volumescheduler
 
 - `RuleRepository.kt`
   - 本地数据读写。
-  - 使用 `SharedPreferences` 保存总开关和规则 JSON。
+  - 使用 `SharedPreferences` 保存总开关、规则 JSON 和触发记录 JSON。
   - 规则变化后负责触发重新注册定时任务。
 
 - `AlarmScheduler.kt`
@@ -114,6 +115,19 @@ Android 发送 BOOT_COMPLETED
 - `VIBRATE`：震动
 - `NORMAL`：声音
 
+触发记录保存为 JSON 数组，最多保留最近 200 条，格式类似：
+
+```json
+[
+  {
+    "timestampMillis": 1710000000000,
+    "description": "22:30 触发：关闭声音，关闭震动，开启静音"
+  }
+]
+```
+
+界面显示时按数组顺序展示，最新记录在最上方。
+
 ## 权限说明
 
 - `MODIFY_AUDIO_SETTINGS`
@@ -154,6 +168,7 @@ Android 发送 BOOT_COMPLETED
 
 - 修改界面文案或布局：看 `MainActivity.kt`。
 - 增加规则字段：先改 `VolumeRule`，再改 `RuleRepository.toJson/toRule`，最后改编辑界面。
+- 修改触发记录格式：看 `TriggerLog`、`RuleRepository.addTriggerLog` 和 `VolumeAlarmReceiver.triggerDescription`。
 - 修改触发策略：看 `AlarmScheduler.kt`。
 - 修改到点后执行的系统行为：看 `VolumeController.kt`。
 - 修改云端构建：看 `.github/workflows/build-apk.yml`。

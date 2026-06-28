@@ -29,3 +29,13 @@ data class VolumeRule(
 ) {
     fun timeText(): String = "%02d:%02d".format(hour, minute)
 }
+
+/**
+ * 一条执行记录。
+ *
+ * 最新记录显示在界面最上方，用于确认 App 是否真的在后台触发过规则。
+ */
+data class TriggerLog(
+    val timestampMillis: Long = System.currentTimeMillis(),
+    val description: String
+)

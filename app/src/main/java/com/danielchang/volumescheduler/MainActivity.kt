@@ -21,6 +21,9 @@ import android.widget.RadioGroup
 import android.widget.ScrollView
 import android.widget.Switch
 import android.widget.TextView
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : Activity() {
     private lateinit var root: LinearLayout
@@ -88,6 +91,9 @@ class MainActivity : Activity() {
         } else {
             rules.forEach { rule -> addRuleCard(rule) }
         }
+
+        root.addSpace(16)
+        addTriggerLogPanel()
     }
 
     private fun addGlobalSwitch() {
@@ -195,15 +201,42 @@ class MainActivity : Activity() {
             text = "点击卡片编辑"
             textSize = 12f
         })
-        card.addView(Button(this).apply {
-            text = "立即应用此规则"
-            setOnClickListener {
-                // 测试入口：不用等定时时间到，直接执行同一套规则应用逻辑。
-                VolumeController.applyRule(this@MainActivity, rule)
-            }
-        })
         root.addView(card)
         root.addSpace(10)
+    }
+
+    private fun addTriggerLogPanel() {
+        root.addView(TextView(this).apply {
+            text = "触发记录"
+            textSize = 20f
+            typeface = Typeface.DEFAULT_BOLD
+        })
+        root.addSpace(8)
+
+        val logs = RuleRepository.getTriggerLogs(this)
+        val content = if (logs.isEmpty()) {
+            "暂无触发记录"
+        } else {
+            val formatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+            logs.joinToString("\n\n") { log ->
+                "${formatter.format(Date(log.timestampMillis))}\n${log.description}"
+            }
+        }
+
+        val logText = TextView(this).apply {
+            text = content
+            textSize = 14f
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+        }
+        val logScroll = ScrollView(this).apply {
+            isVerticalScrollBarEnabled = true
+            background = backgroundDrawable(0xFFF4F4F4.toInt())
+            addView(logText)
+        }
+        root.addView(logScroll, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(220)
+        ))
     }
 
     private fun showRuleDialog(initialRule: VolumeRule) {
@@ -260,16 +293,22 @@ class MainActivity : Activity() {
                 // 输入非法时回退到默认 08:00；正常情况下数字输入框已限制为数字。
                 val hour = hourInput.text.toString().toIntOrNull()?.coerceIn(0, 23) ?: 8
                 val minute = minuteInput.text.toString().toIntOrNull()?.coerceIn(0, 59) ?: 0
-                RuleRepository.upsertRule(
-                    this,
-                    initialRule.copy(
-                        enabled = enabled,
-                        hour = hour,
-                        minute = minute,
-                        profile = profile
-                    )
+                val savedRule = initialRule.copy(
+                    enabled = enabled,
+                    hour = hour,
+                    minute = minute,
+                    profile = profile
                 )
-                render()
+                if (RuleRepository.hasTimeConflict(this, savedRule)) {
+                    AlertDialog.Builder(this)
+                        .setTitle("时间重复")
+                        .setMessage("同一个时间只能设置一条规则，请修改小时或分钟。")
+                        .setPositiveButton("知道了", null)
+                        .show()
+                } else {
+                    RuleRepository.upsertRule(this, savedRule)
+                    render()
+                }
             }
             .setNegativeButton("取消", null)
             .setNeutralButton("删除") { _, _ ->
